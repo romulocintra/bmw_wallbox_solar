@@ -31,130 +31,111 @@ from .const import (
     SSL_MODE_AUTO,
     SSL_MODE_MANUAL,
     SSL_MODE_NONE,
-    SSL_MODES,
 )
 
-SSL_MODE_LABELS = {
-    SSL_MODE_NONE: "None — plain ws:// (use reverse proxy for TLS)",
-    SSL_MODE_AUTO: "Auto — reuse Home Assistant's existing certificate",
-    SSL_MODE_MANUAL: "Manual — specify cert and key file paths",
-}
+SSL_MODE_OPTIONS = [
+    selector.SelectOptionDict(
+        value=SSL_MODE_NONE,
+        label="None — plain ws:// (use a reverse proxy for TLS)",
+    ),
+    selector.SelectOptionDict(
+        value=SSL_MODE_AUTO,
+        label="Auto — reuse Home Assistant's existing certificate",
+    ),
+    selector.SelectOptionDict(
+        value=SSL_MODE_MANUAL,
+        label="Manual — specify cert and key file paths",
+    ),
+]
 
 
 class BMWWallboxSolarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for BMW Wallbox Solar."""
 
     VERSION = 1
-    _data: dict = {}
+
+    def __init__(self) -> None:
+        """Initialise — use instance variable, not class variable."""
+        self._data: dict = {}
+
+    # ── Step 1: port, CP ID, SSL mode ────────────────────────────────────────
 
     async def async_step_user(self, user_input=None):
-        """Step 1: OCPP connection basics + SSL mode."""
-        errors = {}
         if user_input is not None:
             self._data.update(user_input)
-            ssl_mode = user_input.get(CONF_SSL_MODE, SSL_MODE_AUTO)
-            if ssl_mode == SSL_MODE_MANUAL:
+            if user_input.get(CONF_SSL_MODE) == SSL_MODE_MANUAL:
                 return await self.async_step_ssl_manual()
-            # Auto or None — go straight to solar config
             return await self.async_step_solar()
 
-        schema = vol.Schema({
-            vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
-            vol.Optional(CONF_CHARGE_POINT_ID, default=""): str,
-            vol.Optional(CONF_RFID_TOKEN, default=""): str,
-            vol.Required(CONF_MAX_CURRENT, default=DEFAULT_MAX_CURRENT): vol.All(
-                int, vol.Range(min=6, max=32)
-            ),
-            vol.Required(CONF_SSL_MODE, default=SSL_MODE_AUTO): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[
-                        {"value": k, "label": v}
-                        for k, v in SSL_MODE_LABELS.items()
-                    ],
-                    mode=selector.SelectSelectorMode.LIST,
-                )
-            ),
-        })
         return self.async_show_form(
             step_id="user",
-            data_schema=schema,
-            errors=errors,
-            description_placeholders={
-                "info": (
-                    "BMW/Mini wallboxes require WSS. Choose 'Auto' to reuse "
-                    "your HA certificate, 'Manual' to specify paths, or 'None' "
-                    "if you have a reverse proxy (Nginx/Caddy) handling TLS."
-                )
-            },
+            data_schema=vol.Schema({
+                vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
+                vol.Optional(CONF_CHARGE_POINT_ID, default=""): str,
+                vol.Optional(CONF_RFID_TOKEN, default=""): str,
+                vol.Required(CONF_MAX_CURRENT, default=DEFAULT_MAX_CURRENT): vol.All(
+                    int, vol.Range(min=6, max=32)
+                ),
+                vol.Required(CONF_SSL_MODE, default=SSL_MODE_AUTO): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=SSL_MODE_OPTIONS)
+                ),
+            }),
         )
 
+    # ── Step 1b: manual cert paths ───────────────────────────────────────────
+
     async def async_step_ssl_manual(self, user_input=None):
-        """Step 1b: collect cert/key paths when manual SSL is selected."""
-        errors = {}
         if user_input is not None:
             self._data.update(user_input)
             return await self.async_step_solar()
 
-        schema = vol.Schema({
-            vol.Required(CONF_SSL_CERT, default="/ssl/fullchain.pem"): str,
-            vol.Required(CONF_SSL_KEY, default="/ssl/privkey.pem"): str,
-        })
         return self.async_show_form(
             step_id="ssl_manual",
-            data_schema=schema,
-            errors=errors,
+            data_schema=vol.Schema({
+                vol.Required(CONF_SSL_CERT, default="/ssl/fullchain.pem"): str,
+                vol.Required(CONF_SSL_KEY, default="/ssl/privkey.pem"): str,
+            }),
         )
 
+    # ── Step 2: solar entity wiring ──────────────────────────────────────────
+
     async def async_step_solar(self, user_input=None):
-        """Step 2: optional solar entity wiring."""
         if user_input is not None:
             self._data.update(user_input)
-            await self.async_set_unique_id(
-                self._data.get(CONF_CHARGE_POINT_ID)
-                or f"bmw_wallbox_{self._data[CONF_PORT]}"
-            )
+            cp_id = self._data.get(CONF_CHARGE_POINT_ID) or f"bmw_wallbox_{self._data[CONF_PORT]}"
+            await self.async_set_unique_id(cp_id)
             self._abort_if_unique_id_configured()
-            cp_id = self._data.get(CONF_CHARGE_POINT_ID) or f"port {self._data[CONF_PORT]}"
-            return self.async_create_entry(
-                title=f"BMW Wallbox Solar ({cp_id})",
-                data=self._data,
-            )
+            title = f"BMW Wallbox ({self._data.get(CONF_CHARGE_POINT_ID) or f'port {self._data[CONF_PORT]}'})"
+            return self.async_create_entry(title=title, data=self._data)
 
-        schema = vol.Schema({
-            vol.Optional(CONF_SOLAR_POWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_GRID_POWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_HOUSE_LOAD_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_BATTERY_SOC_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_BATTERY_POWER_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Required(CONF_MIN_CHARGE_CURRENT, default=DEFAULT_MIN_CURRENT): vol.All(
-                int, vol.Range(min=6, max=16)
-            ),
-            vol.Required(CONF_BATTERY_RESERVE_SOC, default=DEFAULT_BATTERY_RESERVE_SOC): vol.All(
-                int, vol.Range(min=0, max=100)
-            ),
-            vol.Required(CONF_GRID_EXPORT_LIMIT, default=DEFAULT_GRID_EXPORT_LIMIT): vol.All(
-                float, vol.Range(min=0)
-            ),
-        })
         return self.async_show_form(
             step_id="solar",
-            data_schema=schema,
-            description_placeholders={
-                "hint": (
-                    "Link your inverter sensors (Solarman/Deye, Sunsynk, Huawei Solar, etc.). "
-                    "All fields are optional — skip any you don't have."
-                )
-            },
+            data_schema=vol.Schema({
+                vol.Optional(CONF_SOLAR_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_GRID_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_HOUSE_LOAD_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_BATTERY_SOC_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_BATTERY_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Required(CONF_MIN_CHARGE_CURRENT, default=DEFAULT_MIN_CURRENT): vol.All(
+                    int, vol.Range(min=6, max=16)
+                ),
+                vol.Required(CONF_BATTERY_RESERVE_SOC, default=DEFAULT_BATTERY_RESERVE_SOC): vol.All(
+                    int, vol.Range(min=0, max=100)
+                ),
+                vol.Required(CONF_GRID_EXPORT_LIMIT, default=float(DEFAULT_GRID_EXPORT_LIMIT)): vol.All(
+                    vol.Coerce(float), vol.Range(min=0)
+                ),
+            }),
         )
 
     @staticmethod
@@ -164,55 +145,52 @@ class BMWWallboxSolarConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class BMWWallboxSolarOptionsFlow(config_entries.OptionsFlow):
-    """Options flow to reconfigure after setup."""
+    """Options flow — reconfigure after initial setup."""
 
-    def __init__(self, config_entry):
+    def __init__(self, config_entry) -> None:
         self._config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        errors = {}
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
         current = {**self._config_entry.data, **self._config_entry.options}
 
-        schema = vol.Schema({
-            vol.Required(CONF_PORT, default=current.get(CONF_PORT, DEFAULT_PORT)): int,
-            vol.Required(CONF_MAX_CURRENT, default=current.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)): vol.All(
-                int, vol.Range(min=6, max=32)
-            ),
-            vol.Required(CONF_SSL_MODE, default=current.get(CONF_SSL_MODE, SSL_MODE_AUTO)): selector.SelectSelector(
-                selector.SelectSelectorConfig(
-                    options=[{"value": k, "label": v} for k, v in SSL_MODE_LABELS.items()],
-                    mode=selector.SelectSelectorMode.LIST,
-                )
-            ),
-            vol.Optional(CONF_SSL_CERT, default=current.get(CONF_SSL_CERT, "")): str,
-            vol.Optional(CONF_SSL_KEY, default=current.get(CONF_SSL_KEY, "")): str,
-            vol.Optional(CONF_SOLAR_POWER_ENTITY, default=current.get(CONF_SOLAR_POWER_ENTITY, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_GRID_POWER_ENTITY, default=current.get(CONF_GRID_POWER_ENTITY, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_HOUSE_LOAD_ENTITY, default=current.get(CONF_HOUSE_LOAD_ENTITY, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_BATTERY_SOC_ENTITY, default=current.get(CONF_BATTERY_SOC_ENTITY, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Optional(CONF_BATTERY_POWER_ENTITY, default=current.get(CONF_BATTERY_POWER_ENTITY, "")): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="sensor")
-            ),
-            vol.Required(CONF_MIN_CHARGE_CURRENT, default=current.get(CONF_MIN_CHARGE_CURRENT, DEFAULT_MIN_CURRENT)): vol.All(
-                int, vol.Range(min=6, max=16)
-            ),
-            vol.Required(CONF_BATTERY_RESERVE_SOC, default=current.get(CONF_BATTERY_RESERVE_SOC, DEFAULT_BATTERY_RESERVE_SOC)): vol.All(
-                int, vol.Range(min=0, max=100)
-            ),
-            vol.Required(CONF_GRID_EXPORT_LIMIT, default=current.get(CONF_GRID_EXPORT_LIMIT, DEFAULT_GRID_EXPORT_LIMIT)): vol.All(
-                float, vol.Range(min=0)
-            ),
-        })
-
-        return self.async_show_form(step_id="init", data_schema=schema, errors=errors)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema({
+                vol.Required(CONF_PORT, default=current.get(CONF_PORT, DEFAULT_PORT)): int,
+                vol.Required(CONF_MAX_CURRENT, default=current.get(CONF_MAX_CURRENT, DEFAULT_MAX_CURRENT)): vol.All(
+                    int, vol.Range(min=6, max=32)
+                ),
+                vol.Required(CONF_SSL_MODE, default=current.get(CONF_SSL_MODE, SSL_MODE_AUTO)): selector.SelectSelector(
+                    selector.SelectSelectorConfig(options=SSL_MODE_OPTIONS)
+                ),
+                vol.Optional(CONF_SSL_CERT, default=current.get(CONF_SSL_CERT, "")): str,
+                vol.Optional(CONF_SSL_KEY, default=current.get(CONF_SSL_KEY, "")): str,
+                vol.Optional(CONF_SOLAR_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_GRID_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_HOUSE_LOAD_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_BATTERY_SOC_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(CONF_BATTERY_POWER_ENTITY): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Required(CONF_MIN_CHARGE_CURRENT, default=current.get(CONF_MIN_CHARGE_CURRENT, DEFAULT_MIN_CURRENT)): vol.All(
+                    int, vol.Range(min=6, max=16)
+                ),
+                vol.Required(CONF_BATTERY_RESERVE_SOC, default=current.get(CONF_BATTERY_RESERVE_SOC, DEFAULT_BATTERY_RESERVE_SOC)): vol.All(
+                    int, vol.Range(min=0, max=100)
+                ),
+                vol.Required(CONF_GRID_EXPORT_LIMIT, default=float(current.get(CONF_GRID_EXPORT_LIMIT, DEFAULT_GRID_EXPORT_LIMIT))): vol.All(
+                    vol.Coerce(float), vol.Range(min=0)
+                ),
+            }),
+        )

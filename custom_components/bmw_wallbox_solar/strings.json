@@ -1,1 +1,61 @@
-404: Not Found
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "BMW Wallbox — OCPP Connection",
+        "data": {
+          "port": "WebSocket Port",
+          "charge_point_id": "Charge Point ID (from wallbox OCPP settings)",
+          "rfid_token": "RFID Token (optional)",
+          "max_current": "Maximum Current (A)",
+          "ssl_mode": "SSL / TLS Mode"
+        }
+      },
+      "ssl_manual": {
+        "title": "BMW Wallbox — SSL Certificate Paths",
+        "data": {
+          "ssl_cert": "Certificate file (e.g. /ssl/fullchain.pem)",
+          "ssl_key": "Private key file (e.g. /ssl/privkey.pem)"
+        }
+      },
+      "solar": {
+        "title": "BMW Wallbox — Solar Entities (optional)",
+        "data": {
+          "solar_power_entity": "Solar PV Power (W)",
+          "grid_power_entity": "Grid Power (W, negative = export)",
+          "house_load_entity": "House Load (W)",
+          "battery_soc_entity": "Battery SOC (%)",
+          "battery_power_entity": "Battery Power (W)",
+          "min_charge_current": "Minimum Charge Current for Solar Mode (A)",
+          "battery_reserve_soc": "Battery Reserve SOC (%)",
+          "grid_export_limit": "Max grid import for EV charging (W, 0 = unlimited)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This wallbox is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "BMW Wallbox Solar — Reconfigure",
+        "data": {
+          "port": "WebSocket Port",
+          "max_current": "Maximum Current (A)",
+          "ssl_mode": "SSL / TLS Mode",
+          "ssl_cert": "Certificate file path",
+          "ssl_key": "Private key file path",
+          "solar_power_entity": "Solar PV Power entity",
+          "grid_power_entity": "Grid Power entity",
+          "house_load_entity": "House Load entity",
+          "battery_soc_entity": "Battery SOC entity",
+          "battery_power_entity": "Battery Power entity",
+          "min_charge_current": "Minimum Charge Current for Solar Mode (A)",
+          "battery_reserve_soc": "Battery Reserve SOC (%)",
+          "grid_export_limit": "Max grid import for EV (W)"
+        }
+      }
+    }
+  }
+}

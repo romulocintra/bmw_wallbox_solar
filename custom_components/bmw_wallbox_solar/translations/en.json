@@ -3,7 +3,6 @@
     "step": {
       "user": {
         "title": "BMW Wallbox — OCPP Connection",
-        "description": "{info}",
         "data": {
           "port": "WebSocket Port",
           "charge_point_id": "Charge Point ID (from wallbox OCPP settings)",
@@ -15,24 +14,26 @@
       "ssl_manual": {
         "title": "BMW Wallbox — SSL Certificate Paths",
         "data": {
-          "ssl_cert": "Certificate file path (e.g. /ssl/fullchain.pem)",
-          "ssl_key": "Private key file path (e.g. /ssl/privkey.pem)"
+          "ssl_cert": "Certificate file (e.g. /ssl/fullchain.pem)",
+          "ssl_key": "Private key file (e.g. /ssl/privkey.pem)"
         }
       },
       "solar": {
-        "title": "BMW Wallbox — Solar / Inverter Entities",
-        "description": "{hint}",
+        "title": "BMW Wallbox — Solar Entities (optional)",
         "data": {
-          "solar_power_entity": "Solar PV Power (W)  e.g. sensor.deye_solar_power",
-          "grid_power_entity": "Grid Power (W, negative = export)  e.g. sensor.deye_grid_power",
-          "house_load_entity": "House Load (W)  e.g. sensor.deye_load_power",
-          "battery_soc_entity": "Battery SOC (%)  e.g. sensor.deye_battery_soc",
-          "battery_power_entity": "Battery Power (W)  e.g. sensor.deye_battery_power",
+          "solar_power_entity": "Solar PV Power (W)",
+          "grid_power_entity": "Grid Power (W, negative = export)",
+          "house_load_entity": "House Load (W)",
+          "battery_soc_entity": "Battery SOC (%)",
+          "battery_power_entity": "Battery Power (W)",
           "min_charge_current": "Minimum Charge Current for Solar Mode (A)",
-          "battery_reserve_soc": "Battery Reserve SOC (%) — EV won't draw from battery below this",
-          "grid_export_limit": "Max grid import allowed for EV (W) — 0 = solar only in that mode"
+          "battery_reserve_soc": "Battery Reserve SOC (%)",
+          "grid_export_limit": "Max grid import for EV charging (W, 0 = unlimited)"
         }
       }
+    },
+    "abort": {
+      "already_configured": "This wallbox is already configured"
     }
   },
   "options": {
