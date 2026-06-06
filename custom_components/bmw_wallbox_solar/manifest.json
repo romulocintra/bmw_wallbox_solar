@@ -1,0 +1,16 @@
+{
+  "domain": "bmw_wallbox_solar",
+  "name": "BMW Wallbox Solar Dynamic Charging",
+  "version": "1.0.0",
+  "documentation": "https://github.com/your-repo/bmw-wallbox-solar",
+  "issue_tracker": "https://github.com/your-repo/bmw-wallbox-solar/issues",
+  "dependencies": [],
+  "codeowners": [],
+  "requirements": [
+    "ocpp==1.0.1",
+    "websockets>=11.0"
+  ],
+  "iot_class": "local_push",
+  "config_flow": true,
+  "integration_type": "device"
+}
